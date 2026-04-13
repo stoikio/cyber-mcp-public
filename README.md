@@ -31,7 +31,7 @@ Authentication (JWT / API key) → Policy check (PG) → Rate limit (Redis) → 
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_ORG/cyber-mcp-public.git
+git clone https://github.com/stoikio/cyber-mcp-public.git
 cd cyber-mcp-public
 
 # Create and activate virtual environment
