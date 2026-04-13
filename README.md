@@ -128,21 +128,44 @@ The admin panel provides a web UI for managing:
 
 Set `ENABLE_ADMIN=true` in your environment to start the admin panel alongside the gateway.
 
-## MCP Tools (9 tools)
+## MCP Tools (15 tools)
+
+### Gmail (5)
 
 | Tool | Description |
 |------|-------------|
-| `read_inbox` | Read recent emails from Gmail |
+| `read_inbox` | Read recent emails (sensitive emails auto-filtered) |
 | `read_email` | Read a specific email by ID |
 | `search_emails` | Search emails with Gmail query syntax |
 | `create_draft` | Create a Gmail draft (human-in-the-loop) |
-| `send_slack_dm` | Send a Slack direct message |
-| `read_slack_channel` | Read messages from a Slack channel |
-| `list_calendar_events` | List Google Calendar events |
-| `check_availability` | Check available time slots |
-| `create_calendar_event` | Create a calendar event with attendees |
+| `send_email` | Send an email (blocked by default policy) |
 
-> `send_email` is blocked by default policy — use `create_draft` for human-in-the-loop safety.
+### Slack (4)
+
+| Tool | Description |
+|------|-------------|
+| `send_slack_dm` | Send a direct message to a user |
+| `send_slack_message` | Send a message to a channel (blocked by default policy) |
+| `list_slack_channels` | List available Slack channels |
+| `read_slack_channel` | Read messages from a channel |
+
+### Google Calendar (3)
+
+| Tool | Description |
+|------|-------------|
+| `list_calendar_events` | List events for a date range |
+| `check_availability` | Check available time slots |
+| `create_calendar_event` | Create an event with attendees |
+
+### Notion (3)
+
+| Tool | Description |
+|------|-------------|
+| `notion_search` | Search pages and databases |
+| `notion_read_page` | Read a page's content |
+| `notion_query_database` | Query a database with filters |
+
+> `send_email` and `send_slack_message` are blocked by default policies — use `create_draft` and `send_slack_dm` for safer alternatives.
 
 ## Security policies
 
