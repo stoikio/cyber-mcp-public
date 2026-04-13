@@ -1,0 +1,301 @@
+{
+  "_comment": "Secure MCP Gateway — Default security policies",
+  "_doc": "Chaque politique est évaluée AVANT l'exécution d'un tool. Actions: block (interdit), warn (log + avertissement), log (audit uniquement). Ordre d'évaluation : première politique bloquante gagne.",
+  "policies": [
+    {
+      "name": "require-human-confirmation",
+      "description": "Interdit l'envoi direct d'email — force l'utilisation de create_draft (human-in-the-loop)",
+      "tool_pattern": "send_email",
+      "action": "block",
+      "conditions": {
+        "require_confirmation": true
+      }
+    },
+    {
+      "name": "warn-draft-external-recipient",
+      "description": "Avertit quand un brouillon cible un destinataire hors du domaine autorisé (To ou Cc). Le brouillon est créé mais l'événement est journalisé.",
+      "tool_pattern": "create_draft",
+      "action": "warn",
+      "conditions": {
+        "allowed_recipients": ["@your-company.com"]
+      }
+    },
+    {
+      "name": "block-sensitive-body",
+      "description": "Bloque si un champ texte (body, text, subject, description) contient des patterns sensibles (credentials, clés privées, tokens)",
+      "tool_pattern": "*",
+      "action": "block",
+      "conditions": {
+        "blocked_patterns_body": [
+          "(?i)password\\s*[:=]\\s*\\S+",
+          "(?i)mot de passe\\s*[:=]\\s*\\S+",
+          "(?i)api[_-]?key\\s*[:=]\\s*\\S+",
+          "(?i)secret[_-]?key\\s*[:=]\\s*\\S+",
+          "(?i)access[_-]?token\\s*[:=]\\s*\\S+",
+          "-----BEGIN[\\w\\s]*PRIVATE KEY-----",
+          "(?i)ssh-(?:rsa|ed25519|ecdsa)\\s+AAAA",
+          "(?i)bearer\\s+[A-Za-z0-9._\\-]{20,}"
+        ]
+      }
+    },
+    {
+      "name": "filter-sensitive-emails",
+      "description": "Filtre les emails sensibles (password reset, OTP, magic links) en lecture. Les patterns sont appliqués sur l'expéditeur, le sujet et le corps des emails reçus.",
+      "tool_pattern": "read_*",
+      "action": "block",
+      "conditions": {
+        "restrict_to_own_emails": true,
+        "sensitive_senders": [
+          "noreply@", "no-reply@", "no\\.reply@",
+          "security@", "auth@", "verify@",
+          "account[s]?@", "password@",
+          "notification[s]?@", "alert[s]?@",
+          "signin@", "sign-in@",
+          "support@.*\\.google\\.com",
+          "@accounts\\.google\\.com",
+          "postmaster@", "mailer-daemon@"
+        ],
+        "sensitive_subjects": [
+          "(?i)reset\\s*(your)?\\s*password",
+          "(?i)password\\s*reset",
+          "(?i)r[eé]initialiser?\\s*(votre)?\\s*mot\\s*de\\s*passe",
+          "(?i)verification\\s*code",
+          "(?i)code\\s*de\\s*v[eé]rification",
+          "(?i)verify\\s*your\\s*(email|account|identity)",
+          "(?i)v[eé]rifi(er|ez)\\s*votre",
+          "(?i)confirm\\s*your\\s*(email|account|identity)",
+          "(?i)confirmez?\\s*votre",
+          "(?i)one[- ]?time\\s*(pass)?code",
+          "(?i)\\bOTP\\b",
+          "(?i)\\b2FA\\b",
+          "(?i)\\bMFA\\b",
+          "(?i)two[- ]?factor",
+          "(?i)multi[- ]?factor",
+          "(?i)sign[- ]?in\\s*(attempt|alert|notification)",
+          "(?i)connexion\\s*(suspecte|inhabitu)",
+          "(?i)security\\s*(alert|notification|warning)",
+          "(?i)alerte\\s*de\\s*s[eé]curit[eé]",
+          "(?i)suspicious\\s*(activity|sign[- ]?in|login)",
+          "(?i)new\\s*(device|sign[- ]?in|login)",
+          "(?i)magic\\s*link",
+          "(?i)login\\s*link",
+          "(?i)lien\\s*de\\s*connexion",
+          "(?i)action\\s*required.*account"
+        ],
+        "sensitive_body_patterns": [
+          "https?://[^\\s]*[?&](token|code|key|reset|verify|auth|confirm|challenge)=",
+          "(?:code|Code|CODE)[:\\s]+\\d{4,8}\\b",
+          "\\b\\d{6}\\b(?=.*(?:verification|vérification|confirm|code|enter|saisir))",
+          "(?i)reset\\s*(my|your)?\\s*password",
+          "(?i)réinitialiser\\s*(mon|votre)?\\s*mot\\s*de\\s*passe",
+          "(?i)verify\\s*(my|your)?\\s*(email|account)",
+          "(?i)confirm\\s*(my|your)?\\s*(email|account|identity)",
+          "(?i)click\\s*(here|below)\\s*to\\s*(verify|confirm|reset|sign)",
+          "(?i)cliquez?\\s*(ici|ci-dessous)\\s*pour\\s*(v[eé]rifier|confirmer|r[eé]initialiser)",
+          "accounts\\.google\\.com/signin",
+          "login\\.microsoftonline\\.com",
+          "auth0\\.com",
+          "okta\\.com/signin"
+        ]
+      }
+    },
+    {
+      "name": "filter-sensitive-emails-search",
+      "description": "Applique les mêmes filtres de sécurité email aux résultats de recherche",
+      "tool_pattern": "search_emails",
+      "action": "block",
+      "conditions": {
+        "restrict_to_own_emails": true
+      }
+    },
+    {
+      "name": "sanitize-auth-urls",
+      "description": "Masque les URLs d'authentification (tokens, OAuth, magic links) dans les emails lus par l'agent",
+      "tool_pattern": "read_*",
+      "action": "block",
+      "conditions": {
+        "sanitize_url_patterns": [
+          "(https?://[^\\s]*[?&](?:token|code|key|reset|verify|auth|confirm|challenge)=)[^\\s&\"']*",
+          "(https?://accounts\\.google\\.com/signin/[^\\s\"']*)",
+          "(https?://[^\\s]*oauth[^\\s\"']*)",
+          "(https?://[^\\s]*authorize[^\\s\"']*)"
+        ]
+      }
+    },
+    {
+      "name": "block-automated-recipients",
+      "description": "Bloque l'envoi d'emails vers des adresses automatisées pour prévenir les boucles (agent@, claude@, auto-reply, etc.)",
+      "tool_pattern": "send_email",
+      "action": "block",
+      "conditions": {
+        "blocked_recipient_patterns": [
+          "agent@", "assistant@", "claude@", "automated", "auto-reply", "autoresponse"
+        ]
+      }
+    },
+    {
+      "name": "block-slack-channel-send",
+      "description": "Interdit l'envoi sur les canaux Slack (seuls les DMs via send_slack_dm sont autorisés)",
+      "tool_pattern": "send_slack_message",
+      "action": "block",
+      "conditions": {}
+    },
+    {
+      "name": "block-hr-slack-channels",
+      "description": "Interdit l'accès aux canaux RH sur Slack (hr-* et *-hr-*)",
+      "tool_pattern": "*slack*",
+      "action": "block",
+      "conditions": {
+        "blocked_channels": ["hr-*", "*-hr-*"]
+      }
+    },
+    {
+      "name": "cap-inbox-results",
+      "description": "Limite la lecture de l'inbox à 20 résultats maximum",
+      "tool_pattern": "read_inbox",
+      "action": "block",
+      "conditions": {
+        "max_results_cap": 20
+      }
+    },
+    {
+      "name": "cap-search-results",
+      "description": "Limite les résultats de recherche email à 20 maximum",
+      "tool_pattern": "search_emails",
+      "action": "block",
+      "conditions": {
+        "max_results_cap": 20
+      }
+    },
+    {
+      "name": "require-email-search-query",
+      "description": "Oblige un terme de recherche pour éviter le dump complet de la boîte email",
+      "tool_pattern": "search_emails",
+      "action": "block",
+      "conditions": {
+        "require_query": true
+      }
+    },
+    {
+      "name": "cap-calendar-date-range",
+      "description": "Limite la plage de consultation du calendrier à 30 jours",
+      "tool_pattern": "list_calendar_events",
+      "action": "block",
+      "conditions": {
+        "max_date_range_days": 30
+      }
+    },
+    {
+      "name": "whitelist-calendar-attendees",
+      "description": "N'autorise les invitations calendrier qu'aux adresses du domaine autorisé",
+      "tool_pattern": "create_calendar_event",
+      "action": "block",
+      "conditions": {
+        "allowed_attendees": ["@your-company.com"]
+      }
+    },
+    {
+      "name": "cap-calendar-attendees",
+      "description": "Limite le nombre d'invités par événement calendrier à 25 maximum",
+      "tool_pattern": "create_calendar_event",
+      "action": "block",
+      "conditions": {
+        "max_attendees": 25
+      }
+    },
+    {
+      "name": "require-notion-search-query",
+      "description": "Oblige un terme de recherche Notion pour éviter le listing global",
+      "tool_pattern": "notion_search",
+      "action": "block",
+      "conditions": {
+        "require_query": true
+      }
+    },
+    {
+      "name": "cap-notion-search-results",
+      "description": "Limite les résultats de recherche Notion à 20 maximum",
+      "tool_pattern": "notion_search",
+      "action": "block",
+      "conditions": {
+        "max_results_cap": 20
+      }
+    },
+    {
+      "name": "require-notion-database-filter",
+      "description": "Oblige un filtre pour requêter une base Notion, pour éviter le dump complet de la base de données",
+      "tool_pattern": "notion_query_database",
+      "action": "block",
+      "conditions": {
+        "require_filter": true
+      }
+    },
+    {
+      "name": "cap-message-length",
+      "description": "Limite la taille des messages sortants (body + text + description) à 5000 caractères pour prévenir l'exfiltration de données",
+      "tool_pattern": "*",
+      "action": "block",
+      "conditions": {
+        "max_message_length": 5000
+      }
+    },
+    {
+      "name": "cap-slack-channel-results",
+      "description": "Limite la lecture des canaux Slack à 50 messages maximum",
+      "tool_pattern": "read_slack_channel",
+      "action": "block",
+      "conditions": {
+        "max_results_cap": 50
+      }
+    },
+    {
+      "name": "log-email-read",
+      "description": "Journalise chaque lecture d'email individuel pour traçabilité",
+      "tool_pattern": "read_email",
+      "action": "log",
+      "conditions": {}
+    },
+    {
+      "name": "log-notion-page-read",
+      "description": "Journalise chaque lecture de page Notion pour traçabilité",
+      "tool_pattern": "notion_read_page",
+      "action": "log",
+      "conditions": {}
+    },
+    {
+      "name": "log-notion-database-query",
+      "description": "Journalise chaque requête de base de données Notion pour traçabilité",
+      "tool_pattern": "notion_query_database",
+      "action": "log",
+      "conditions": {}
+    },
+    {
+      "name": "log-slack-dm",
+      "description": "Journalise chaque message direct Slack envoyé par l'agent pour traçabilité",
+      "tool_pattern": "send_slack_dm",
+      "action": "log",
+      "conditions": {}
+    },
+    {
+      "name": "log-slack-channel-read",
+      "description": "Journalise chaque lecture de canal Slack pour traçabilité",
+      "tool_pattern": "read_slack_channel",
+      "action": "log",
+      "conditions": {}
+    },
+    {
+      "name": "log-calendar-event-creation",
+      "description": "Journalise chaque création d'événement calendrier pour traçabilité",
+      "tool_pattern": "create_calendar_event",
+      "action": "log",
+      "conditions": {}
+    },
+    {
+      "name": "audit-all-tools",
+      "description": "Journalise tout appel d'outil (filet de sécurité global)",
+      "tool_pattern": "*",
+      "action": "log",
+      "conditions": {}
+    }
+  ]
+}
